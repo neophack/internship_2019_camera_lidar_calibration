@@ -38,7 +38,6 @@ def check_files_names(x):
             VideoFlow=val
     return (VideoFlow)   
 
-
 def dir_check (prev_azimuth, out):
     if (prev_azimuth==None):
         try:
@@ -84,7 +83,8 @@ def unpack_pcap(dirs,out,camera_azimuth):
             #print ('  ts_sec+ts_usec ',timestemp_pcap) 
             data = packet[offset + 16 + 42 : offset + 16 + 42 + 1200 + 4 + 2]
             #print (' data ',data.encode('hex'))
-            first_timestamp, factory = struct.unpack_from("<IH", data, offset=1200)  #timestamp for the first firing in the packet data
+	    #timestamp for the first firing in the packet data
+            first_timestamp, factory = struct.unpack_from("<IH", data, offset=1200) 
             assert hex(factory) == '0x2237', 'Error mode: 0x22=VLP-16, 0x37=Strongest Return'
             #print ('   first_timestamp ', first_timestamp/1e6) 
             #print ('    ts_sec+ts_usec+first_timestamp ',timestemp_pcap+(first_timestamp/1e6)) 
@@ -103,18 +103,19 @@ def unpack_pcap(dirs,out,camera_azimuth):
                             step_azimuth=third_azimuth+ROTATION_MAX_UNITS-first_azimuth
                         else:
                             step_azimuth=third_azimuth-first_azimuth
-                    arr = struct.unpack_from('<' + "HB" * NUM_LASERS, data, seq_offset + 4 + step * 3 * 16) # read (dist and reflectivity) for each channel (from 16 lines) for 1/2 seq
+		    # read (dist and reflectivity) for each channel (from 16 lines) for 1/2 seq
+                    arr = struct.unpack_from('<' + "HB" * NUM_LASERS, data, seq_offset + 4 + step * 3 * 16)
                     #16 lidar points have different time and azimuth offset
                     for i in xrange(NUM_LASERS): 
                         time_offset = (55.296 * seq_index + 2.304 * i) /1e6
                         azimuth = first_azimuth+ (step_azimuth * (55.296/1e6 * step +i * (2.304/1e6)))/(2 * 55.296/1e6)
-                        #print('    first_timestamp + time_offset', (timestemp_pcap+(first_timestamp + time_offset)/1e6, 'seq=',seq_index, 'step=', step ))
+                        #print(' first_timestamp + time_offset', (timestemp_pcap+(first_timestamp + time_offset)/1e6, 'seq=',seq_index, 'step=', step ))
                         if (azimuth>ROTATION_MAX_UNITS): 
                                 azimuth-=ROTATION_MAX_UNITS        
                         if arr[i * 2] != 0:
                             #points array with the real [X Y Z Reflection] values
                             points.append(calc_real_val(arr[i * 2], azimuth, i, arr[i * 2 + 1]))
-                            
+                         
                             # create file for start values of the laser time rotation (timestamps_start.txt)
                             if (prev_azimuth>35800) and (prev_azimuth>azimuth):
                                 f= open(Video_Flow_path+'/timestamp/timestamps_start.txt',"a+")
@@ -181,7 +182,3 @@ if __name__ == '__main__':
     main()
 
     
-                
-                    
-
-        

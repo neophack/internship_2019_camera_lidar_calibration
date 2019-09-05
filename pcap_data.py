@@ -38,8 +38,9 @@ def check_files_names(x):
             VideoFlow=val
     return (VideoFlow)   
 
-def dir_check (prev_azimuth, out):
-    if (prev_azimuth==None):
+
+def dir_check (cur_Video_Flow,Video_Flow, out):
+    if (cur_Video_Flow!=Video_Flow):
         try:
             if os.path.exists(os.path.join(out, 'data')) is False:
                     os.makedirs(os.path.join(out, 'data'))
@@ -64,14 +65,14 @@ def unpack_pcap(dirs,out,camera_azimuth):
     scan_index=-1
     az_step_frame_index = scan_index
     azimuth_step = ROTATION_MAX_UNITS
-    
+    cur_Video_Flow = None
     for x in files:
         Video_Flow=check_files_names(x)
         Video_Flow_path=os.path.join(out, Video_Flow)
         d = open(x, 'rb').read()  
         n = len(d)
         packet = d[24 : ]        #packet header and packet data  without global header
-        dir_check (prev_azimuth, Video_Flow_path)
+        dir_check(cur_Video_Flow,Video_Flow, Video_Flow_path)
         #read data packet №offset in pcap file        
         for offset in xrange(0, n-24, 1264):
             if (n-offset) < 1264: break  
@@ -83,10 +84,10 @@ def unpack_pcap(dirs,out,camera_azimuth):
             #print ('  ts_sec+ts_usec ',timestemp_pcap) 
             data = packet[offset + 16 + 42 : offset + 16 + 42 + 1200 + 4 + 2]
             #print (' data ',data.encode('hex'))
-	    #timestamp for the first firing in the packet data
-            first_timestamp, factory = struct.unpack_from("<IH", data, offset=1200) 
+            first_timestamp, factory = struct.unpack_from("<IH", data, offset=1200)  #timestamp for the first firing in the packet data
             assert hex(factory) == '0x2237', 'Error mode: 0x22=VLP-16, 0x37=Strongest Return'
             #print ('   first_timestamp ', first_timestamp/1e6) 
+            print ('   first_timestamp ', first_timestamp) 
             #print ('    ts_sec+ts_usec+first_timestamp ',timestemp_pcap+(first_timestamp/1e6)) 
             
             seq_index = 0  
@@ -103,19 +104,18 @@ def unpack_pcap(dirs,out,camera_azimuth):
                             step_azimuth=third_azimuth+ROTATION_MAX_UNITS-first_azimuth
                         else:
                             step_azimuth=third_azimuth-first_azimuth
-		    # read (dist and reflectivity) for each channel (from 16 lines) for 1/2 seq
-                    arr = struct.unpack_from('<' + "HB" * NUM_LASERS, data, seq_offset + 4 + step * 3 * 16)
+                    arr = struct.unpack_from('<' + "HB" * NUM_LASERS, data, seq_offset + 4 + step * 3 * 16) # read (dist and reflectivity) for each channel (from 16 lines) for 1/2 seq
                     #16 lidar points have different time and azimuth offset
                     for i in xrange(NUM_LASERS): 
                         time_offset = (55.296 * seq_index + 2.304 * i) /1e6
                         azimuth = first_azimuth+ (step_azimuth * (55.296/1e6 * step +i * (2.304/1e6)))/(2 * 55.296/1e6)
-                        #print(' first_timestamp + time_offset', (timestemp_pcap+(first_timestamp + time_offset)/1e6, 'seq=',seq_index, 'step=', step ))
+                        #print('    first_timestamp + time_offset', (timestemp_pcap+(first_timestamp + time_offset)/1e6, 'seq=',seq_index, 'step=', step ))
                         if (azimuth>ROTATION_MAX_UNITS): 
                                 azimuth-=ROTATION_MAX_UNITS        
                         if arr[i * 2] != 0:
                             #points array with the real [X Y Z Reflection] values
                             points.append(calc_real_val(arr[i * 2], azimuth, i, arr[i * 2 + 1]))
-                         
+                            print (calc_real_val(arr[i * 2], azimuth, i, arr[i * 2 + 1]))
                             # create file for start values of the laser time rotation (timestamps_start.txt)
                             if (prev_azimuth>35800) and (prev_azimuth>azimuth):
                                 f= open(Video_Flow_path+'/timestamp/timestamps_start.txt',"a+")
@@ -164,6 +164,8 @@ def unpack_pcap(dirs,out,camera_azimuth):
                     seq_index += 1 
   
     #delete start rotation file (it's contain not full 0-360 azimuth)               
+    cur_Video_Flow==Video_Flow
+    scan_index=-1
     try:
         if os.path.exists(Video_Flow_path+'/data/-1.txt') is True:
             os.remove(Video_Flow_path+'/data/-1.txt')
@@ -172,7 +174,7 @@ def unpack_pcap(dirs,out,camera_azimuth):
         
 def main():
     if len(sys.argv) == 4:
-        print ('unpack from', sys.argv[1], 'to', sys.argv[2], 'camera azimyth =', sys.argv[3])
+        print ('unpack from', sys.argv[1], 'to', sys.argv[2], 'camera azimuth =', sys.argv[3])
         unpack_pcap(sys.argv[1],sys.argv[2],float(sys.argv[3]))   
     else:
         print_help_and_exit1()
@@ -182,3 +184,7 @@ if __name__ == '__main__':
     main()
 
     
+                
+                    
+
+        

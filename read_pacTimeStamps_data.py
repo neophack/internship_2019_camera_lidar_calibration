@@ -4,6 +4,7 @@ import os,re
 import gzip
 import sys,glob
 from datetime import datetime
+from distutils.dir_util import copy_tree
 import yaml
 import shutil
 
@@ -27,6 +28,7 @@ def move_images(counter, framesdir,YAML_Image_name,dev_name, out, image_time):
     """
 copy image files from framesdir folder to out folder with timestamp from YAML file
    structure of out folder:
+        calib/ (copied calibration txts)
         VideoFlow/Device_name/data (copied image files)
         VideoFlow/Device_name/timestamp.txt
         """   
@@ -45,6 +47,7 @@ copy image files from framesdir folder to out folder with timestamp from YAML fi
     except Exception, e:
         print e
         
+    copy_tree(framesdir+"/calib", out+"/calib")
     for item in glob.iglob(os.path.join(framesdir, "*.bmp")):
         if ((os.path.split(os.path.splitext(item)[0])[-1]) == YAML_Image_name):
             shutil.copy(item, data_path)
@@ -108,6 +111,7 @@ def read_yaml(dirs,framesdir,out):
     VideoNumbers=[]
     counter=0
     files = glob.glob(dirs+'\*.yml.gz')
+    
     for x in files:
         f_names = os.path.split(os.path.splitext(x)[0])[-1] 
         mat=re.match(r"(?P<flow>\S+)\.(?P<VideoFlow>\d+)\.(?P<VideoNumber>\d+)\.(?P<info>\S+)\.(?P<type>\d*)", f_names)
@@ -116,6 +120,7 @@ def read_yaml(dirs,framesdir,out):
                 VideoNumbers.append(val)
             if  key.startswith("VideoFlow"):
                 VideoFlows.append(val)   
+        
         """read yaml file's data"""        
         with gzip.open(x,"r") as config:
             data = yaml.safe_load_all(config)
@@ -180,9 +185,11 @@ def read_yaml(dirs,framesdir,out):
                             for key, value in velodyneLidars.iteritems():
                                 if key.startswith("grabMsec"):
                                     velodyneLidar_grabMsec=int(key[len("grabMsec:"):])
+                                    #print ('velodyneLidar_grabMsec',velodyneLidar_grabMsec)
                                 if key.startswith("lidarData"):
                                     pacTimeStamps = value["pacTimeStamps"]
-                            time_photo_and_lidar = datetime.fromtimestamp(velodyneLidar_grabMsec/1e9+leftImage_deviceSec).strftime('%Y-%m-%d_%H_%M_%S.%f') 
+                                    #print (pacTimeStamps)
+                            time_photo_and_lidar = datetime.fromtimestamp(velodyneLidar_grabMsec/1e6+leftImage_deviceSec).strftime('%Y-%m-%d_%H_%M_%S.%f') 
                             timestamp_lidar = [pacTimeStamps[0],pacTimeStamps[-1]]
                             save_lidar_timestamps(time_photo_and_lidar, timestamp_lidar, out,VideoFlows[-1],counter)
                             counter+=1

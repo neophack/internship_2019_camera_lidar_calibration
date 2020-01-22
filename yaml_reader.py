@@ -45,6 +45,8 @@ class YML_Read:
             self.image_number = 0
             yml_file = str(self.yml_files[i])
             file_name = (yml_file.split('\\')[-1])[:-3]
+            #linux_version
+            #file_name = (yml_file.split('/')[-1])[:-3]
 
             self.regular_expression(yml_file=file_name)
             print(f'Reading {file_name} ...')

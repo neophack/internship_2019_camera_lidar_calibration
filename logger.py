@@ -35,7 +35,7 @@ class LogWriter:
     def save_images(self, yaml_img_name, image_time):
 
         for item in self.image_files:
-            if (str(item).split('\\')[-1])[:-4] == yaml_img_name:
+            if (item.stem == yaml_img_name):
                 shutil.copy(item, str(self.image_data_path))
 
         with open(str(self.image_path / 'timestamps.txt'), "a+") as f:

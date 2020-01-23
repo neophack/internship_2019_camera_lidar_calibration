@@ -21,10 +21,8 @@ class YML_Read:
 
         self.pcap_files = np.sort([x for x in self.pcap_path.glob('*.pcap') if x.is_file()])
         self.yml_files = np.sort([x for x in self.yml_path.glob('*.gz*') if x.is_file()])
-        self.image_files = [(str(x).split('\\')[-1])[:-4] for x in self.images.glob('*.bmp') if x.is_file()]
-
-        #linux version
-        #self.image_files = [(str(x).split('/')[-1])[:-4] for x in self.images.glob('*.bmp') if x.is_file()]
+        # cross-platform way to get file name without extention
+        self.image_files = [x.stem for x in self.images.glob('*.bmp') if x.is_file()]
 
         self.processing = PointProcessing(data_path)
         self.writer = LogWriter(data_path)
@@ -43,10 +41,8 @@ class YML_Read:
             range_yml = np.arange(len(self.yml_files))
         for i in range_yml:
             self.image_number = 0
-            yml_file = str(self.yml_files[i])
-            file_name = (yml_file.split('\\')[-1])[:-3]
-            #linux_version
-            #file_name = (yml_file.split('/')[-1])[:-3]
+            yml_file = self.yml_files[i]
+            file_name = yml_file.stem # cross-platform way to get file name without extention
 
             self.regular_expression(yml_file=file_name)
             print(f'Reading {file_name} ...')
@@ -90,6 +86,8 @@ class YML_Read:
                     self.writer.save_lidar_data(time_lidar=time_lidar, df=self.XYZD_info)
 
     def lidar_timestamps_processing(self, last_pacTimeStamp):
+        import datetime
+        start = datetime.datetime.now()
         XYZD_info_temp = self.processing.get_all_points_by_timestamp(last_pacTimeStamp,
                                                                      pcap_index=self.VideoNumbers[-1],
                                                                      read_next_pcap_file = False)
@@ -101,6 +99,8 @@ class YML_Read:
             self.XYZD_info['counter'] = self.XYZD_info.duplicated(["azimuth", "laser_id"], keep="last")
             self.XYZD_info = self.XYZD_info[self.XYZD_info['counter'] == False]
             self.XYZD_info = self.XYZD_info.drop(['counter'], axis=1)
+        dt = datetime.datetime.now() - start
+        #print('lidar_timestamps_processing finished in', dt, ' sec')
 
         #print("XYZD_info ", self.XYZD_info)
 

@@ -35,16 +35,17 @@ class LogWriter:
     def save_images(self, yaml_img_name, image_time):
 
         for item in self.image_files:
-            if (item.stem == yaml_img_name):
+            if item.stem == yaml_img_name:
+                print('Saving camera data, file name =', yaml_img_name)
                 shutil.copy(item, str(self.image_data_path))
 
         with open(str(self.image_path / 'timestamps.txt'), "a+") as f:
             f.write("%s\n" % datetime.fromtimestamp(image_time).strftime('%Y-%m-%d %H:%M:%S.%f'))
 
     def save_lidar_data(self, time_lidar, df):
-        print('Saving lidar data, file number =', self.indx)
+        # print('Saving lidar data, file number =', self.indx)
         with open(str(self.lidar_path / 'timestamps.txt'), "a+") as f:
             f.write("%s\n" % time_lidar)
-        path = (str(self.lidar_data_path / str(self.indx))+ '.csv')
+        path = (str(self.lidar_data_path / str(self.indx)) + '.csv')
         df.to_csv(path, header=False, index=False)
         self.indx += 1

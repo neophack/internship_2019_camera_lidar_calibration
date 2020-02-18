@@ -6,10 +6,10 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 
-
 from pcap_reader import PointProcessing
 from logger import LogWriter
 
+pd.options.mode.chained_assignment = None
 
 class YML_Read:
 
@@ -33,12 +33,11 @@ class YML_Read:
         self.writer = LogWriter(data_path)
 
         self.processed_images = []
-        self.VideoFlows  = None
+        self.VideoFlows = None
         self.VideoNumbers = None
         self.time_lidar = None
-        self.image_number = None
-        self.XYZD_info = pd.DataFrame({'X': [], 'Y': [], 'Z': [], 'D': [], 'azimuth': [], 'laser_id': [],
-                                       'first_timestamp': [], 'pcap_num': []})
+        self.image_number = 0
+        self.pcap_file_df = pd.DataFrame()
 
     def power(self, range_yml=None):
         """
@@ -50,7 +49,8 @@ class YML_Read:
 
         Function description:
             goes through all yml in range_yml
-            create for each file dataframe with {'X','Y', 'Z', 'D', 'azimuth', 'laser_id', 'first_timestamp', 'pcap_num'} colums
+            create for each file dataframe with {'X','Y', 'Z', 'D',
+                        'azimuth', 'laser_id', 'first_timestamp', 'file_number'} colums
 
         Dependent functions:
             self.regular_expression(yml_file.stem) - read yml file name
@@ -58,10 +58,10 @@ class YML_Read:
         """
         print('Running main loop...')
         if range_yml is None:
-            range_yml = np.arange(len(self.yml_files))
-        for i in range_yml:
-            self.XYZD_info = pd.DataFrame({'X': [], 'Y': [], 'Z': [], 'D': [], 'azimuth': [], 'laser_id': [],
-                                           'first_timestamp': [], 'pcap_num': []})
+            range_yml = len(self.yml_files)
+        for i in np.arange(range_yml):
+            self.pcap_file_df = pd.DataFrame({'X': [], 'Y': [], 'Z': [], 'D': [],
+                                              'azimuth': [], 'laser_id': [], 'first_timestamp': [], 'file_number': []})
             yml_file = self.yml_files[i]
             file_name = yml_file.stem
 
@@ -150,26 +150,26 @@ class YML_Read:
         pacTimeStamps = None
         for key, value in sorted(shot.items(), reverse=True):
             if key.startswith("velodyneLidar"):
-
                 pacTimeStamps = shot['velodyneLidar']["lidarData"]["pacTimeStamps"]
-                XYZD_info_temp = self.processing.get_all_points_from_pcap(pcap_index=self.VideoNumbers)
-                if XYZD_info_temp:
-                    self.XYZD_info = pd.DataFrame.from_dict(XYZD_info_temp)
+                pcap_file_list = self.processing.get_all_points_from_pcap(pcap_index=self.VideoNumbers)
+                if pcap_file_list:
+                    self.pcap_file_df = pd.DataFrame(pcap_file_list)
 
             if key.startswith("leftImage"):
-                yaml_img_name, leftImage_deviceSec, leftImage_grabMsec = self.camera_timestamps_processing(shot['leftImage'].items())
+                yaml_img_name, leftImage_deviceSec, leftImage_grabMsec \
+                    = self.camera_timestamps_processing(shot['leftImage'].items())
 
                 if yaml_img_name in self.image_files and yaml_img_name not in self.processed_images:
                     self.processed_images.append(yaml_img_name)
-
                     if pacTimeStamps is not None:
+                        self.writer.save_images(yaml_img_name=yaml_img_name, image_time=(leftImage_grabMsec / 1e6
+                                                                                         + leftImage_deviceSec))
+                        time_lidar = datetime.fromtimestamp(leftImage_grabMsec / 1e6
+                                                            + leftImage_deviceSec).strftime('%Y-%m-%d_%H_%M_%S.%f')
 
-                        self.writer.save_images(yaml_img_name=yaml_img_name, image_time=(leftImage_grabMsec / 1e6 + leftImage_deviceSec))
-                        time_lidar = datetime.fromtimestamp(leftImage_grabMsec / 1e6 + leftImage_deviceSec).strftime('%Y-%m-%d_%H_%M_%S.%f')
-
-                        csv_data_timestamp = self.XYZD_info[self.XYZD_info['first_timestamp'] < int(pacTimeStamps[-1])]
-                        csv_data_timestamp['counter'] = csv_data_timestamp.duplicated(["azimuth", "laser_id"], keep="last")
-                        csv_data_timestamp = csv_data_timestamp[csv_data_timestamp['counter'] == False]
+                        csv_data_timestamp = self.pcap_file_df[
+                            self.pcap_file_df['first_timestamp'] < int(pacTimeStamps[-1])]
+                        csv_data_timestamp = csv_data_timestamp.drop_duplicates(["azimuth", "laser_id"], keep="last")
                         self.writer.save_lidar_data(time_lidar=time_lidar, df=csv_data_timestamp)
 
     def camera_timestamps_processing(self, camera_items):
@@ -185,13 +185,17 @@ class YML_Read:
             leftImage_grabMsec - image receiving time (Msec))
 
         """
-        leftImage_deviceSec = None
-        leftImage_grabMsec = None
+        leftImage_deviceSec = 0
+        leftImage_grabMsec = 0
 
-        yaml_img_name = ("new." + str(self.VideoFlows) + '.' + str(self.VideoNumbers) + '.' + 'left.' + str('%000006d' % self.image_number))
+        yaml_img_name = ("new." + str(self.VideoFlows) + '.' + str(self.VideoNumbers) + '.' + 'left.'
+                         + str('%000006d' % self.image_number))
         self.image_number += 1
 
         for key_Image, value_Image in camera_items:
-            if key_Image.startswith("deviceSec"): leftImage_deviceSec = int(key_Image[len("deviceSec:"):])
-            if key_Image.startswith("grabMsec"):  leftImage_grabMsec = int(key_Image[len("grabMsec:"):])
+            if key_Image.startswith("deviceSec"):
+                leftImage_deviceSec = int(key_Image[len("deviceSec:"):])
+            if key_Image.startswith("grabMsec"):
+                leftImage_grabMsec = int(key_Image[len("grabMsec:"):])
+
         return yaml_img_name, leftImage_deviceSec, leftImage_grabMsec
